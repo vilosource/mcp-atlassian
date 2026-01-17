@@ -12,12 +12,14 @@ Key models:
 - ConfluenceVersion: Content versioning information
 """
 
+from .analytics import PageViews, PageViewsBatchResponse
 from .comment import ConfluenceComment
 from .common import ConfluenceAttachment, ConfluenceUser
 from .label import ConfluenceLabel
 from .page import ConfluencePage, ConfluenceVersion
 from .search import ConfluenceSearchResult
 from .space import ConfluenceSpace
+from .user_search import ConfluenceUserSearchResult, ConfluenceUserSearchResults
 
 __all__ = [
     "ConfluenceUser",
@@ -28,4 +30,9 @@ __all__ = [
     "ConfluenceLabel",
     "ConfluencePage",
     "ConfluenceSearchResult",
+    "ConfluenceUserSearchResult",
+    "ConfluenceUserSearchResults",
+    # Analytics models
+    "PageViews",
+    "PageViewsBatchResponse",
 ]

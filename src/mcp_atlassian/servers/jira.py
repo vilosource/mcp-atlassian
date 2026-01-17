@@ -12,18 +12,20 @@ from mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
 from mcp_atlassian.jira.constants import DEFAULT_READ_JIRA_FIELDS
 from mcp_atlassian.models.jira.common import JiraUser
 from mcp_atlassian.servers.dependencies import get_jira_fetcher
-from mcp_atlassian.utils import convert_empty_defaults_to_none
 from mcp_atlassian.utils.decorators import check_write_access
 
 logger = logging.getLogger(__name__)
 
 jira_mcp = FastMCP(
     name="Jira MCP Service",
-    description="Provides tools for interacting with Atlassian Jira.",
+    instructions="Provides tools for interacting with Atlassian Jira.",
 )
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get User Profile", "readOnlyHint": True},
+)
 async def get_user_profile(
     ctx: Context,
     user_identifier: Annotated[
@@ -81,8 +83,10 @@ async def get_user_profile(
     return json.dumps(response_data, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Issue", "readOnlyHint": True},
+)
 async def get_issue(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -98,15 +102,15 @@ async def get_issue(
         ),
     ] = ",".join(DEFAULT_READ_JIRA_FIELDS),
     expand: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "(Optional) Fields to expand. Examples: 'renderedFields' (for rendered content), "
                 "'transitions' (for available status transitions), 'changelog' (for history)"
             ),
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
     comment_limit: Annotated[
         int,
         Field(
@@ -117,12 +121,12 @@ async def get_issue(
         ),
     ] = 10,
     properties: Annotated[
-        str,
+        str | None,
         Field(
             description="(Optional) A comma-separated list of issue properties to return",
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
     update_history: Annotated[
         bool,
         Field(
@@ -165,8 +169,10 @@ async def get_issue(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Search Issues", "readOnlyHint": True},
+)
 async def search(
     ctx: Context,
     jql: Annotated[
@@ -203,24 +209,24 @@ async def search(
         Field(description="Starting index for pagination (0-based)", default=0, ge=0),
     ] = 0,
     projects_filter: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "(Optional) Comma-separated list of project keys to filter results by. "
                 "Overrides the environment variable JIRA_PROJECTS_FILTER if provided."
             ),
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
     expand: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "(Optional) fields to expand. Examples: 'renderedFields', 'transitions', 'changelog'"
             ),
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
 ) -> str:
     """Search Jira issues using JQL (Jira Query Language).
 
@@ -253,7 +259,10 @@ async def search(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Search Fields", "readOnlyHint": True},
+)
 async def search_fields(
     ctx: Context,
     keyword: Annotated[
@@ -287,7 +296,10 @@ async def search_fields(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Project Issues", "readOnlyHint": True},
+)
 async def get_project_issues(
     ctx: Context,
     project_key: Annotated[str, Field(description="The project key")],
@@ -319,7 +331,10 @@ async def get_project_issues(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Transitions", "readOnlyHint": True},
+)
 async def get_transitions(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -339,7 +354,10 @@ async def get_transitions(
     return json.dumps(transitions, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Worklog", "readOnlyHint": True},
+)
 async def get_worklog(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -359,7 +377,10 @@ async def get_worklog(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Download Attachments", "readOnlyHint": True},
+)
 async def download_attachments(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -382,22 +403,25 @@ async def download_attachments(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Agile Boards", "readOnlyHint": True},
+)
 async def get_agile_boards(
     ctx: Context,
     board_name: Annotated[
-        str, Field(description="(Optional) The name of board, support fuzzy search")
-    ] = "",
+        str | None,
+        Field(description="(Optional) The name of board, support fuzzy search"),
+    ] = None,
     project_key: Annotated[
-        str, Field(description="(Optional) Jira project key (e.g., 'PROJ-123')")
-    ] = "",
+        str | None, Field(description="(Optional) Jira project key (e.g., 'PROJ-123')")
+    ] = None,
     board_type: Annotated[
-        str,
+        str | None,
         Field(
             description="(Optional) The type of jira board (e.g., 'scrum', 'kanban')"
         ),
-    ] = "",
+    ] = None,
     start_at: Annotated[
         int,
         Field(description="Starting index for pagination (0-based)", default=0, ge=0),
@@ -432,8 +456,10 @@ async def get_agile_boards(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Board Issues", "readOnlyHint": True},
+)
 async def get_board_issues(
     ctx: Context,
     board_id: Annotated[str, Field(description="The id of the board (e.g., '1001')")],
@@ -510,15 +536,17 @@ async def get_board_issues(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Sprints from Board", "readOnlyHint": True},
+)
 async def get_sprints_from_board(
     ctx: Context,
     board_id: Annotated[str, Field(description="The id of board (e.g., '1000')")],
     state: Annotated[
-        str,
+        str | None,
         Field(description="Sprint state (e.g., 'active', 'future', 'closed')"),
-    ] = "",
+    ] = None,
     start_at: Annotated[
         int,
         Field(description="Starting index for pagination (0-based)", default=0, ge=0),
@@ -548,8 +576,10 @@ async def get_sprints_from_board(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Sprint Issues", "readOnlyHint": True},
+)
 async def get_sprint_issues(
     ctx: Context,
     sprint_id: Annotated[str, Field(description="The id of sprint (e.g., '10001')")],
@@ -597,7 +627,10 @@ async def get_sprint_issues(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Link Types", "readOnlyHint": True},
+)
 async def get_link_types(ctx: Context) -> str:
     """Get all available issue link types.
 
@@ -613,8 +646,10 @@ async def get_link_types(ctx: Context) -> str:
     return json.dumps(formatted_link_types, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Create Issue", "destructiveHint": True},
+)
 @check_write_access
 async def create_issue(
     ctx: Context,
@@ -640,24 +675,24 @@ async def create_issue(
         ),
     ],
     assignee: Annotated[
-        str,
+        str | None,
         Field(
             description="(Optional) Assignee's user identifier (string): Email, display name, or account ID (e.g., 'user@example.com', 'John Doe', 'accountid:...')",
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
     description: Annotated[
-        str, Field(description="Issue description", default="")
-    ] = "",
+        str | None, Field(description="Issue description", default=None)
+    ] = None,
     components: Annotated[
-        str,
+        str | None,
         Field(
             description="(Optional) Comma-separated list of component names to assign (e.g., 'Frontend,API')",
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
     additional_fields: Annotated[
-        dict[str, Any],
+        dict[str, Any] | str | None,
         Field(
             description=(
                 "(Optional) Dictionary of additional fields to set. Examples:\n"
@@ -667,9 +702,9 @@ async def create_issue(
                 "- Set Fix Version/s: {'fixVersions': [{'id': '10020'}]}\n"
                 "- Custom fields: {'customfield_10010': 'value'}"
             ),
-            default_factory=dict,
+            default=None,
         ),
-    ] = {},  # noqa: B006
+    ] = None,
 ) -> str:
     """Create a new Jira issue with optional Epic link or parent for subtasks.
 
@@ -681,7 +716,7 @@ async def create_issue(
         assignee: Assignee's user identifier (string): Email, display name, or account ID (e.g., 'user@example.com', 'John Doe', 'accountid:...').
         description: Issue description.
         components: Comma-separated list of component names.
-        additional_fields: Dictionary of additional fields.
+        additional_fields: Dictionary or JSON string of additional fields.
 
     Returns:
         JSON string representing the created issue object.
@@ -698,9 +733,22 @@ async def create_issue(
         ]
 
     # Use additional_fields directly as dict
-    extra_fields = additional_fields or {}
-    if not isinstance(extra_fields, dict):
-        raise ValueError("additional_fields must be a dictionary.")
+    # Accept either dict or JSON string for additional fields
+    if additional_fields is None:
+        extra_fields: dict[str, Any] = {}
+    elif isinstance(additional_fields, dict):
+        extra_fields = additional_fields
+    elif isinstance(additional_fields, str):
+        try:
+            extra_fields = json.loads(additional_fields)
+            if not isinstance(extra_fields, dict):
+                raise ValueError(
+                    "Parsed additional_fields is not a JSON object (dict)."
+                )
+        except json.JSONDecodeError as e:
+            raise ValueError(f"additional_fields is not valid JSON: {e}") from e
+    else:
+        raise ValueError("additional_fields must be a dictionary or JSON string.")
 
     issue = jira.create_issue(
         project_key=project_key,
@@ -719,7 +767,10 @@ async def create_issue(
     )
 
 
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Batch Create Issues", "destructiveHint": True},
+)
 @check_write_access
 async def batch_create_issues(
     ctx: Context,
@@ -788,8 +839,10 @@ async def batch_create_issues(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Batch Get Changelogs", "readOnlyHint": True},
+)
 async def batch_get_changelogs(
     ctx: Context,
     issue_ids_or_keys: Annotated[
@@ -799,12 +852,12 @@ async def batch_get_changelogs(
         ),
     ],
     fields: Annotated[
-        list[str],
+        list[str] | None,
         Field(
-            description="(Optional) Filter the changelogs by fields, e.g. ['status', 'assignee']. Default to [] for all fields.",
-            default_factory=list,
+            description="(Optional) Filter the changelogs by fields, e.g. ['status', 'assignee']. Default to None for all fields.",
+            default=None,
         ),
-    ] = [],  # noqa: B006
+    ] = None,
     limit: Annotated[
         int,
         Field(
@@ -861,8 +914,10 @@ async def batch_get_changelogs(
     return json.dumps(results, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Update Issue", "destructiveHint": True},
+)
 @check_write_access
 async def update_issue(
     ctx: Context,
@@ -877,22 +932,22 @@ async def update_issue(
         ),
     ],
     additional_fields: Annotated[
-        dict[str, Any],
+        dict[str, Any] | None,
         Field(
             description="(Optional) Dictionary of additional fields to update. Use this for custom fields or more complex updates.",
-            default_factory=dict,
+            default=None,
         ),
-    ] = {},  # noqa: B006
+    ] = None,
     attachments: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "(Optional) JSON string array or comma-separated list of file paths to attach to the issue. "
                 "Example: '/path/to/file1.txt,/path/to/file2.txt' or ['/path/to/file1.txt','/path/to/file2.txt']"
             ),
-            default="",
+            default=None,
         ),
-    ] = "",
+    ] = None,
 ) -> str:
     """Update an existing Jira issue including changing status, adding Epic links, updating fields, etc.
 
@@ -963,7 +1018,10 @@ async def update_issue(
         raise ValueError(f"Failed to update issue {issue_key}: {str(e)}")
 
 
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Delete Issue", "destructiveHint": True},
+)
 @check_write_access
 async def delete_issue(
     ctx: Context,
@@ -988,12 +1046,21 @@ async def delete_issue(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Add Comment", "destructiveHint": True},
+)
 @check_write_access
 async def add_comment(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
     comment: Annotated[str, Field(description="Comment text in Markdown format")],
+    visibility: Annotated[
+        dict[str, str] | None,
+        Field(
+            description="""(Optional) Comment visibility (e.g. {"type":"group","value":"jira-users"})"""
+        ),
+    ] = None,
 ) -> str:
     """Add a comment to a Jira issue.
 
@@ -1001,6 +1068,7 @@ async def add_comment(
         ctx: The FastMCP context.
         issue_key: Jira issue key.
         comment: Comment text in Markdown.
+        visibility: (Optional) Comment visibility (e.g. {"type":"group","value":"jira-users"}).
 
     Returns:
         JSON string representing the added comment object.
@@ -1010,12 +1078,54 @@ async def add_comment(
     """
     jira = await get_jira_fetcher(ctx)
     # add_comment returns dict
-    result = jira.add_comment(issue_key, comment)
+    result = jira.add_comment(issue_key, comment, visibility)
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Edit Comment", "destructiveHint": True},
+)
+@check_write_access
+async def edit_comment(
+    ctx: Context,
+    issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
+    comment_id: Annotated[str, Field(description="The ID of the comment to edit")],
+    comment: Annotated[
+        str, Field(description="Updated comment text in Markdown format")
+    ],
+    visibility: Annotated[
+        dict[str, str] | None,
+        Field(
+            description="""(Optional) Comment visibility (e.g. {"type":"group","value":"jira-users"})"""
+        ),
+    ] = None,
+) -> str:
+    """Edit an existing comment on a Jira issue.
+
+    Args:
+        ctx: The FastMCP context.
+        issue_key: Jira issue key.
+        comment_id: The ID of the comment to edit.
+        comment: Updated comment text in Markdown.
+        visibility: (Optional) Comment visibility (e.g. {"type":"group","value":"jira-users"}).
+
+    Returns:
+        JSON string representing the updated comment object.
+
+    Raises:
+        ValueError: If in read-only mode or Jira client unavailable.
+    """
+    jira = await get_jira_fetcher(ctx)
+    # edit_comment returns dict
+    result = jira.edit_comment(issue_key, comment_id, comment, visibility)
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Add Worklog", "destructiveHint": True},
+)
 @check_write_access
 async def add_worklog(
     ctx: Context,
@@ -1030,25 +1140,25 @@ async def add_worklog(
         ),
     ],
     comment: Annotated[
-        str,
+        str | None,
         Field(description="(Optional) Comment for the worklog in Markdown format"),
-    ] = "",
+    ] = None,
     started: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "(Optional) Start time in ISO format. If not provided, the current time will be used. "
                 "Example: '2023-08-01T12:00:00.000+0000'"
             )
         ),
-    ] = "",
+    ] = None,
     # Add original_estimate and remaining_estimate as per original tool
     original_estimate: Annotated[
-        str, Field(description="(Optional) New value for the original estimate")
-    ] = "",
+        str | None, Field(description="(Optional) New value for the original estimate")
+    ] = None,
     remaining_estimate: Annotated[
-        str, Field(description="(Optional) New value for the remaining estimate")
-    ] = "",
+        str | None, Field(description="(Optional) New value for the remaining estimate")
+    ] = None,
 ) -> str:
     """Add a worklog entry to a Jira issue.
 
@@ -1082,7 +1192,10 @@ async def add_worklog(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Link to Epic", "destructiveHint": True},
+)
 @check_write_access
 async def link_to_epic(
     ctx: Context,
@@ -1115,8 +1228,10 @@ async def link_to_epic(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Create Issue Link", "destructiveHint": True},
+)
 @check_write_access
 async def create_issue_link(
     ctx: Context,
@@ -1133,15 +1248,15 @@ async def create_issue_link(
         str, Field(description="The key of the outward issue (e.g., 'PROJ-456')")
     ],
     comment: Annotated[
-        str, Field(description="(Optional) Comment to add to the link")
-    ] = "",
+        str | None, Field(description="(Optional) Comment to add to the link")
+    ] = None,
     comment_visibility: Annotated[
-        dict[str, str],
+        dict[str, str] | None,
         Field(
             description="(Optional) Visibility settings for the comment (e.g., {'type': 'group', 'value': 'jira-users'})",
-            default_factory=dict,
+            default=None,
         ),
-    ] = {},  # noqa: B006
+    ] = None,
 ) -> str:
     """Create a link between two Jira issues.
 
@@ -1184,7 +1299,95 @@ async def create_issue_link(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Create Remote Issue Link", "destructiveHint": True},
+)
+@check_write_access
+async def create_remote_issue_link(
+    ctx: Context,
+    issue_key: Annotated[
+        str,
+        Field(description="The key of the issue to add the link to (e.g., 'PROJ-123')"),
+    ],
+    url: Annotated[
+        str,
+        Field(
+            description="The URL to link to (e.g., 'https://example.com/page' or Confluence page URL)"
+        ),
+    ],
+    title: Annotated[
+        str,
+        Field(
+            description="The title/name of the link (e.g., 'Documentation Page', 'Confluence Page')"
+        ),
+    ],
+    summary: Annotated[
+        str | None, Field(description="(Optional) Description of the link")
+    ] = None,
+    relationship: Annotated[
+        str | None,
+        Field(
+            description="(Optional) Relationship description (e.g., 'causes', 'relates to', 'documentation')"
+        ),
+    ] = None,
+    icon_url: Annotated[
+        str | None, Field(description="(Optional) URL to a 16x16 icon for the link")
+    ] = None,
+) -> str:
+    """Create a remote issue link (web link or Confluence link) for a Jira issue.
+
+    This tool allows you to add web links and Confluence links to Jira issues.
+    The links will appear in the issue's "Links" section and can be clicked to navigate to external resources.
+
+    Args:
+        ctx: The FastMCP context.
+        issue_key: The key of the issue to add the link to.
+        url: The URL to link to (can be any web page or Confluence page).
+        title: The title/name that will be displayed for the link.
+        summary: Optional description of what the link is for.
+        relationship: Optional relationship description.
+        icon_url: Optional URL to a 16x16 icon for the link.
+
+    Returns:
+        JSON string indicating success or failure.
+
+    Raises:
+        ValueError: If required fields are missing, invalid input, in read-only mode, or Jira client unavailable.
+    """
+    jira = await get_jira_fetcher(ctx)
+    if not issue_key:
+        raise ValueError("issue_key is required.")
+    if not url:
+        raise ValueError("url is required.")
+    if not title:
+        raise ValueError("title is required.")
+
+    # Build the remote link data structure
+    link_object = {
+        "url": url,
+        "title": title,
+    }
+
+    if summary:
+        link_object["summary"] = summary
+
+    if icon_url:
+        link_object["icon"] = {"url16x16": icon_url, "title": title}
+
+    link_data = {"object": link_object}
+
+    if relationship:
+        link_data["relationship"] = relationship
+
+    result = jira.create_remote_issue_link(issue_key, link_data)
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Remove Issue Link", "destructiveHint": True},
+)
 @check_write_access
 async def remove_issue_link(
     ctx: Context,
@@ -1210,8 +1413,10 @@ async def remove_issue_link(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Transition Issue", "destructiveHint": True},
+)
 @check_write_access
 async def transition_issue(
     ctx: Context,
@@ -1226,25 +1431,25 @@ async def transition_issue(
         ),
     ],
     fields: Annotated[
-        dict[str, Any],
+        dict[str, Any] | None,
         Field(
             description=(
                 "(Optional) Dictionary of fields to update during the transition. "
                 "Some transitions require specific fields to be set (e.g., resolution). "
                 "Example: {'resolution': {'name': 'Fixed'}}"
             ),
-            default_factory=dict,
+            default=None,
         ),
-    ] = {},  # noqa: B006
+    ] = None,
     comment: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "(Optional) Comment to add during the transition. "
                 "This will be visible in the issue history."
             ),
         ),
-    ] = "",
+    ] = None,
 ) -> str:
     """Transition a Jira issue to a new status.
 
@@ -1284,8 +1489,10 @@ async def transition_issue(
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Create Sprint", "destructiveHint": True},
+)
 @check_write_access
 async def create_sprint(
     ctx: Context,
@@ -1299,7 +1506,9 @@ async def create_sprint(
     end_date: Annotated[
         str, Field(description="End time for sprint (ISO 8601 format)")
     ],
-    goal: Annotated[str, Field(description="(Optional) Goal of the sprint")] = "",
+    goal: Annotated[
+        str | None, Field(description="(Optional) Goal of the sprint")
+    ] = None,
 ) -> str:
     """Create Jira sprint for a board.
 
@@ -1328,26 +1537,30 @@ async def create_sprint(
     return json.dumps(sprint.to_simplified_dict(), indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Update Sprint", "destructiveHint": True},
+)
 @check_write_access
 async def update_sprint(
     ctx: Context,
     sprint_id: Annotated[str, Field(description="The id of sprint (e.g., '10001')")],
     sprint_name: Annotated[
-        str, Field(description="(Optional) New name for the sprint")
-    ] = "",
+        str | None, Field(description="(Optional) New name for the sprint")
+    ] = None,
     state: Annotated[
-        str,
+        str | None,
         Field(description="(Optional) New state for the sprint (future|active|closed)"),
-    ] = "",
+    ] = None,
     start_date: Annotated[
-        str, Field(description="(Optional) New start date for the sprint")
-    ] = "",
+        str | None, Field(description="(Optional) New start date for the sprint")
+    ] = None,
     end_date: Annotated[
-        str, Field(description="(Optional) New end date for the sprint")
-    ] = "",
-    goal: Annotated[str, Field(description="(Optional) New goal for the sprint")] = "",
+        str | None, Field(description="(Optional) New end date for the sprint")
+    ] = None,
+    goal: Annotated[
+        str | None, Field(description="(Optional) New goal for the sprint")
+    ] = None,
 ) -> str:
     """Update jira sprint.
 
@@ -1385,7 +1598,10 @@ async def update_sprint(
         return json.dumps(sprint.to_simplified_dict(), indent=2, ensure_ascii=False)
 
 
-@jira_mcp.tool(tags={"jira", "read"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Project Versions", "readOnlyHint": True},
+)
 async def get_project_versions(
     ctx: Context,
     project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
@@ -1396,21 +1612,91 @@ async def get_project_versions(
     return json.dumps(versions, indent=2, ensure_ascii=False)
 
 
-@convert_empty_defaults_to_none
-@jira_mcp.tool(tags={"jira", "write"})
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get All Projects", "readOnlyHint": True},
+)
+async def get_all_projects(
+    ctx: Context,
+    include_archived: Annotated[
+        bool,
+        Field(
+            description="Whether to include archived projects in the results",
+            default=False,
+        ),
+    ] = False,
+) -> str:
+    """Get all Jira projects accessible to the current user.
+
+    Args:
+        ctx: The FastMCP context.
+        include_archived: Whether to include archived projects.
+
+    Returns:
+        JSON string representing a list of project objects accessible to the user.
+        Project keys are always returned in uppercase.
+        If JIRA_PROJECTS_FILTER is configured, only returns projects matching those keys.
+
+    Raises:
+        ValueError: If the Jira client is not configured or available.
+    """
+    try:
+        jira = await get_jira_fetcher(ctx)
+        projects = jira.get_all_projects(include_archived=include_archived)
+    except (MCPAtlassianAuthenticationError, HTTPError, OSError, ValueError) as e:
+        error_message = ""
+        log_level = logging.ERROR
+        if isinstance(e, MCPAtlassianAuthenticationError):
+            error_message = f"Authentication/Permission Error: {str(e)}"
+        elif isinstance(e, OSError | HTTPError):
+            error_message = f"Network or API Error: {str(e)}"
+        elif isinstance(e, ValueError):
+            error_message = f"Configuration Error: {str(e)}"
+
+        error_result = {
+            "success": False,
+            "error": error_message,
+        }
+        logger.log(log_level, f"get_all_projects failed: {error_message}")
+        return json.dumps(error_result, indent=2, ensure_ascii=False)
+
+    # Ensure all project keys are uppercase
+    for project in projects:
+        if "key" in project:
+            project["key"] = project["key"].upper()
+
+    # Apply project filter if configured
+    if jira.config.projects_filter:
+        # Split projects filter by commas and handle possible whitespace
+        allowed_project_keys = {
+            p.strip().upper() for p in jira.config.projects_filter.split(",")
+        }
+        projects = [
+            project
+            for project in projects
+            if project.get("key") in allowed_project_keys
+        ]
+
+    return json.dumps(projects, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(
+    tags={"jira", "write"},
+    annotations={"title": "Create Version", "destructiveHint": True},
+)
 @check_write_access
 async def create_version(
     ctx: Context,
     project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
     name: Annotated[str, Field(description="Name of the version")],
     start_date: Annotated[
-        str, Field(description="Start date (YYYY-MM-DD)", default=None)
+        str | None, Field(description="Start date (YYYY-MM-DD)", default=None)
     ] = None,
     release_date: Annotated[
-        str, Field(description="Release date (YYYY-MM-DD)", default=None)
+        str | None, Field(description="Release date (YYYY-MM-DD)", default=None)
     ] = None,
     description: Annotated[
-        str, Field(description="Description of the version", default=None)
+        str | None, Field(description="Description of the version", default=None)
     ] = None,
 ) -> str:
     """Create a new fix version in a Jira project.
@@ -1443,3 +1729,132 @@ async def create_version(
         return json.dumps(
             {"success": False, "error": str(e)}, indent=2, ensure_ascii=False
         )
+
+
+@jira_mcp.tool(
+    name="batch_create_versions",
+    tags={"jira", "write"},
+    annotations={"title": "Batch Create Versions", "destructiveHint": True},
+)
+@check_write_access
+async def batch_create_versions(
+    ctx: Context,
+    project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
+    versions: Annotated[
+        str,
+        Field(
+            description=(
+                "JSON array of version objects. Each object should contain:\n"
+                "- name (required): Name of the version\n"
+                "- startDate (optional): Start date (YYYY-MM-DD)\n"
+                "- releaseDate (optional): Release date (YYYY-MM-DD)\n"
+                "- description (optional): Description of the version\n"
+                "Example: [\n"
+                '  {"name": "v1.0", "startDate": "2025-01-01", "releaseDate": "2025-02-01", "description": "First release"},\n'
+                '  {"name": "v2.0"}\n'
+                "]"
+            )
+        ),
+    ],
+) -> str:
+    """Batch create multiple versions in a Jira project.
+
+    Args:
+        ctx: The FastMCP context.
+        project_key: The project key.
+        versions: JSON array string of version objects.
+
+    Returns:
+        JSON array of results, each with success flag, version or error.
+    """
+    jira = await get_jira_fetcher(ctx)
+    try:
+        version_list = json.loads(versions)
+        if not isinstance(version_list, list):
+            raise ValueError("Input 'versions' must be a JSON array string.")
+    except json.JSONDecodeError:
+        raise ValueError("Invalid JSON in versions")
+    except Exception as e:
+        raise ValueError(f"Invalid input for versions: {e}") from e
+
+    results = []
+    if not version_list:
+        return json.dumps(results, indent=2, ensure_ascii=False)
+
+    for idx, v in enumerate(version_list):
+        # Defensive: ensure v is a dict and has a name
+        if not isinstance(v, dict) or not v.get("name"):
+            results.append(
+                {
+                    "success": False,
+                    "error": f"Item {idx}: Each version must be an object with at least a 'name' field.",
+                }
+            )
+            continue
+        try:
+            version = jira.create_project_version(
+                project_key=project_key,
+                name=v["name"],
+                start_date=v.get("startDate"),
+                release_date=v.get("releaseDate"),
+                description=v.get("description"),
+            )
+            results.append({"success": True, "version": version})
+        except Exception as e:
+            logger.error(
+                f"Error creating version in batch for project {project_key}: {str(e)}",
+                exc_info=True,
+            )
+            results.append({"success": False, "error": str(e), "input": v})
+    return json.dumps(results, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(
+    tags={"jira", "read", "metrics"},
+    annotations={"title": "Get Issue Dates", "readOnlyHint": True},
+)
+async def jira_get_issue_dates(
+    ctx: Context,
+    issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
+    include_status_changes: Annotated[
+        bool,
+        Field(
+            description="Include status change history with timestamps and durations"
+        ),
+    ] = True,
+    include_status_summary: Annotated[
+        bool,
+        Field(description="Include aggregated time spent in each status"),
+    ] = True,
+) -> str:
+    """
+    Get date information and status transition history for a Jira issue.
+
+    Returns dates (created, updated, due date, resolution date) and optionally
+    status change history with time tracking for workflow analysis.
+
+    Args:
+        ctx: The FastMCP context.
+        issue_key: The Jira issue key.
+        include_status_changes: Whether to include status change history.
+        include_status_summary: Whether to include aggregated time per status.
+
+    Returns:
+        JSON string with issue dates and optional status tracking data.
+    """
+    jira = await get_jira_fetcher(ctx)
+    try:
+        result = jira.get_issue_dates(
+            issue_key=issue_key,
+            include_created=True,
+            include_updated=True,
+            include_due_date=True,
+            include_resolution_date=True,
+            include_status_changes=include_status_changes,
+            include_status_summary=include_status_summary,
+        )
+        return json.dumps(result.to_simplified_dict(), indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting issue dates for {issue_key}: {str(e)}")
+        error_result = {"success": False, "error": str(e), "issue_key": issue_key}
+        return json.dumps(error_result, indent=2, ensure_ascii=False)

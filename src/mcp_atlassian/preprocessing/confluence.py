@@ -4,15 +4,19 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
 
 from md2conf.converter import (
     ConfluenceConverterOptions,
     ConfluenceStorageFormatConverter,
-    elements_from_string,
     elements_to_string,
     markdown_to_html,
 )
+
+# Handle md2conf API changes: elements_from_string may be renamed to elements_from_strings
+try:
+    from md2conf.converter import elements_from_string
+except ImportError:
+    from md2conf.converter import elements_from_strings as elements_from_string
 
 from .base import BasePreprocessor
 
@@ -22,22 +26,24 @@ logger = logging.getLogger("mcp-atlassian")
 class ConfluencePreprocessor(BasePreprocessor):
     """Handles text preprocessing for Confluence content."""
 
-    def __init__(self, base_url: str, **kwargs: Any) -> None:
+    def __init__(self, base_url: str) -> None:
         """
         Initialize the Confluence text preprocessor.
 
         Args:
             base_url: Base URL for Confluence API
-            **kwargs: Additional arguments for the base class
         """
-        super().__init__(base_url=base_url, **kwargs)
+        super().__init__(base_url=base_url)
 
-    def markdown_to_confluence_storage(self, markdown_content: str) -> str:
+    def markdown_to_confluence_storage(
+        self, markdown_content: str, *, enable_heading_anchors: bool = False
+    ) -> str:
         """
         Convert Markdown content to Confluence storage format (XHTML)
 
         Args:
             markdown_content: Markdown text to convert
+            enable_heading_anchors: Whether to enable automatic heading anchor generation (default: False)
 
         Returns:
             Confluence storage format (XHTML) string
@@ -55,7 +61,9 @@ class ConfluencePreprocessor(BasePreprocessor):
 
                 # Create converter options
                 options = ConfluenceConverterOptions(
-                    ignore_invalid_url=True, heading_anchors=True, render_mermaid=False
+                    ignore_invalid_url=True,
+                    heading_anchors=enable_heading_anchors,
+                    render_mermaid=False,
                 )
 
                 # Create a converter

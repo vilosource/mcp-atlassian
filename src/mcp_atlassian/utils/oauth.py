@@ -28,6 +28,13 @@ TOKEN_URL = "https://auth.atlassian.com/oauth/token"  # noqa: S105 - This is a p
 AUTHORIZE_URL = "https://auth.atlassian.com/authorize"
 CLOUD_ID_URL = "https://api.atlassian.com/oauth/token/accessible-resources"
 TOKEN_EXPIRY_MARGIN = 300  # 5 minutes in seconds
+
+# HTTP request timeouts (in seconds)
+# Connection timeout: Time to establish TCP connection
+# Read timeout: Time to receive response after connection established
+HTTP_CONNECT_TIMEOUT = 5
+HTTP_READ_TIMEOUT = 20
+HTTP_TIMEOUT = (HTTP_CONNECT_TIMEOUT, HTTP_READ_TIMEOUT)
 KEYRING_SERVICE_NAME = "mcp-atlassian-oauth"
 
 
@@ -106,7 +113,7 @@ class OAuthConfig:
             logger.info(f"Exchanging authorization code for tokens at {TOKEN_URL}")
             logger.debug(f"Token exchange payload: {pprint.pformat(payload)}")
 
-            response = requests.post(TOKEN_URL, data=payload)
+            response = requests.post(TOKEN_URL, data=payload, timeout=HTTP_TIMEOUT)
 
             # Log more details about the response
             logger.debug(f"Token exchange response status: {response.status_code}")
@@ -200,7 +207,7 @@ class OAuthConfig:
             }
 
             logger.debug("Refreshing access token...")
-            response = requests.post(TOKEN_URL, data=payload)
+            response = requests.post(TOKEN_URL, data=payload, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
 
             # Parse the response
@@ -241,7 +248,7 @@ class OAuthConfig:
 
         try:
             headers = {"Authorization": f"Bearer {self.access_token}"}
-            response = requests.get(CLOUD_ID_URL, headers=headers)
+            response = requests.get(CLOUD_ID_URL, headers=headers, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
 
             resources = response.json()
@@ -383,41 +390,113 @@ class OAuthConfig:
         """Create an OAuth configuration from environment variables.
 
         Returns:
-            OAuthConfig instance or None if required environment variables are missing
+            OAuthConfig instance or None if OAuth is not enabled
         """
+        # Check if OAuth is explicitly enabled (allows minimal config)
+        oauth_enabled = os.getenv("ATLASSIAN_OAUTH_ENABLE", "").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+
         # Check for required environment variables
         client_id = os.getenv("ATLASSIAN_OAUTH_CLIENT_ID")
         client_secret = os.getenv("ATLASSIAN_OAUTH_CLIENT_SECRET")
         redirect_uri = os.getenv("ATLASSIAN_OAUTH_REDIRECT_URI")
         scope = os.getenv("ATLASSIAN_OAUTH_SCOPE")
 
-        # All of these are required for OAuth configuration
-        if not all([client_id, client_secret, redirect_uri, scope]):
+        # Full OAuth configuration (traditional mode)
+        if all([client_id, client_secret, redirect_uri, scope]):
+            # Create the OAuth configuration with full credentials
+            config = cls(
+                client_id=client_id,
+                client_secret=client_secret,
+                redirect_uri=redirect_uri,
+                scope=scope,
+                cloud_id=os.getenv("ATLASSIAN_OAUTH_CLOUD_ID"),
+            )
+
+            # Try to load existing tokens
+            token_data = cls.load_tokens(client_id)
+            if token_data:
+                config.refresh_token = token_data.get("refresh_token")
+                config.access_token = token_data.get("access_token")
+                config.expires_at = token_data.get("expires_at")
+                if not config.cloud_id and "cloud_id" in token_data:
+                    config.cloud_id = token_data["cloud_id"]
+
+            return config
+
+        # Minimal OAuth configuration (user-provided tokens mode)
+        elif oauth_enabled:
+            # Create minimal config that works with user-provided tokens
+            logger.info(
+                "Creating minimal OAuth config for user-provided tokens (ATLASSIAN_OAUTH_ENABLE=true)"
+            )
+            return cls(
+                client_id="",  # Will be provided by user tokens
+                client_secret="",  # Not needed for user tokens
+                redirect_uri="",  # Not needed for user tokens
+                scope="",  # Will be determined by user token permissions
+                cloud_id=os.getenv("ATLASSIAN_OAUTH_CLOUD_ID"),  # Optional fallback
+            )
+
+        # No OAuth configuration
+        return None
+
+
+@dataclass
+class BYOAccessTokenOAuthConfig:
+    """OAuth configuration when providing a pre-existing access token.
+
+    This class is used when the user provides their own Atlassian Cloud ID
+    and access token directly, bypassing the full OAuth 2.0 (3LO) flow.
+    It's suitable for scenarios like service accounts or CI/CD pipelines
+    where an access token is already available.
+
+    This configuration does not support token refreshing.
+    """
+
+    cloud_id: str
+    access_token: str
+    refresh_token: None = None
+    expires_at: None = None
+
+    @classmethod
+    def from_env(cls) -> Optional["BYOAccessTokenOAuthConfig"]:
+        """Create a BYOAccessTokenOAuthConfig from environment variables.
+
+        Reads `ATLASSIAN_OAUTH_CLOUD_ID` and `ATLASSIAN_OAUTH_ACCESS_TOKEN`.
+
+        Returns:
+            BYOAccessTokenOAuthConfig instance or None if required
+            environment variables are missing.
+        """
+        cloud_id = os.getenv("ATLASSIAN_OAUTH_CLOUD_ID")
+        access_token = os.getenv("ATLASSIAN_OAUTH_ACCESS_TOKEN")
+
+        if not all([cloud_id, access_token]):
             return None
 
-        # Create the OAuth configuration
-        config = cls(
-            client_id=client_id,
-            client_secret=client_secret,
-            redirect_uri=redirect_uri,
-            scope=scope,
-            cloud_id=os.getenv("ATLASSIAN_OAUTH_CLOUD_ID"),
-        )
+        return cls(cloud_id=cloud_id, access_token=access_token)
 
-        # Try to load existing tokens
-        token_data = cls.load_tokens(client_id)
-        if token_data:
-            config.refresh_token = token_data.get("refresh_token")
-            config.access_token = token_data.get("access_token")
-            config.expires_at = token_data.get("expires_at")
-            if not config.cloud_id and "cloud_id" in token_data:
-                config.cloud_id = token_data["cloud_id"]
 
-        return config
+def get_oauth_config_from_env() -> OAuthConfig | BYOAccessTokenOAuthConfig | None:
+    """Get the appropriate OAuth configuration from environment variables.
+
+    This function attempts to load standard OAuth configuration first (OAuthConfig).
+    If that's not available, it tries to load a "Bring Your Own Access Token"
+    configuration (BYOAccessTokenOAuthConfig).
+
+    Returns:
+        An instance of OAuthConfig or BYOAccessTokenOAuthConfig if environment
+        variables are set for either, otherwise None.
+    """
+    return BYOAccessTokenOAuthConfig.from_env() or OAuthConfig.from_env()
 
 
 def configure_oauth_session(
-    session: requests.Session, oauth_config: OAuthConfig
+    session: requests.Session, oauth_config: OAuthConfig | BYOAccessTokenOAuthConfig
 ) -> bool:
     """Configure a requests session with OAuth 2.0 authentication.
 
@@ -445,6 +524,11 @@ def configure_oauth_session(
         return True
     logger.debug("configure_oauth_session: Proceeding to ensure_valid_token.")
     # Otherwise, ensure we have a valid token (refresh if needed)
+    if isinstance(oauth_config, BYOAccessTokenOAuthConfig):
+        logger.error(
+            "configure_oauth_session: oauth access token configuration provided as empty string."
+        )
+        return False
     if not oauth_config.ensure_valid_token():
         logger.error(
             f"configure_oauth_session: ensure_valid_token returned False. "

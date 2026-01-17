@@ -250,9 +250,9 @@ class ProjectsMixin(JiraClient, SearchOperationsProto):
             List of issue type data dictionaries
         """
         try:
-            meta = self.jira.issue_createmeta(project=project_key)
+            meta = self.jira.issue_createmeta_issuetypes(project=project_key)
             if not isinstance(meta, dict):
-                msg = f"Unexpected return value type from `jira.issue_createmeta`: {type(meta)}"
+                msg = f"Unexpected return value type from `jira.issue_createmeta_issuetypes`: {type(meta)}"
                 logger.error(msg)
                 raise TypeError(msg)
 
@@ -283,7 +283,7 @@ class ProjectsMixin(JiraClient, SearchOperationsProto):
         """
         try:
             # Use JQL to count issues in the project
-            jql = f"project = {project_key}"
+            jql = f'project = "{project_key}"'
             result = self.jira.jql(jql=jql, fields="key", limit=1)
             if not isinstance(result, dict):
                 msg = f"Unexpected return value type from `jira.jql`: {type(result)}"
@@ -319,7 +319,7 @@ class ProjectsMixin(JiraClient, SearchOperationsProto):
         """
         try:
             # Use JQL to get issues in the project
-            jql = f"project = {project_key}"
+            jql = f'project = "{project_key}"'
 
             return self.search_issues(jql, start=start, limit=limit)
 

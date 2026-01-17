@@ -166,7 +166,7 @@ def test_get_project_issues(projects_mixin: ProjectsMixin):
 
     # Verify search_issues was called, not jira.jql
     projects_mixin.search_issues.assert_called_once_with(
-        "project = TEST",
+        'project = "TEST"',
         start=0,
         limit=50,
     )
@@ -201,7 +201,7 @@ def test_get_project_issues_with_start(projects_mixin: ProjectsMixin) -> None:
 
     # Verify search_issues was called with the correct arguments
     projects_mixin.search_issues.assert_called_once_with(
-        f"project = {project_key}",
+        f'project = "{project_key}"',
         start=start_index,
         limit=5,
     )
@@ -425,25 +425,27 @@ def test_get_project_issue_types(
             {"key": "PROJ1", "name": "Project One", "issuetypes": mock_issue_types}
         ]
     }
-    projects_mixin.jira.issue_createmeta.return_value = createmeta
+    projects_mixin.jira.issue_createmeta_issuetypes.return_value = createmeta
 
     result = projects_mixin.get_project_issue_types("PROJ1")
     assert result == mock_issue_types
-    projects_mixin.jira.issue_createmeta.assert_called_once_with(project="PROJ1")
+    projects_mixin.jira.issue_createmeta_issuetypes.assert_called_once_with(
+        project="PROJ1"
+    )
 
 
 def test_get_project_issue_types_empty_response(projects_mixin: ProjectsMixin):
     """Test get_project_issue_types method with empty response."""
     # Empty projects list
-    projects_mixin.jira.issue_createmeta.return_value = {"projects": []}
+    projects_mixin.jira.issue_createmeta_issuetypes.return_value = {"projects": []}
 
     result = projects_mixin.get_project_issue_types("PROJ1")
     assert result == []
-    projects_mixin.jira.issue_createmeta.assert_called_once()
+    projects_mixin.jira.issue_createmeta_issuetypes.assert_called_once()
 
     # No issuetypes field
-    projects_mixin.jira.issue_createmeta.reset_mock()
-    projects_mixin.jira.issue_createmeta.return_value = {
+    projects_mixin.jira.issue_createmeta_issuetypes.reset_mock()
+    projects_mixin.jira.issue_createmeta_issuetypes.return_value = {
         "projects": [{"key": "PROJ1", "name": "Project One"}]
     }
 
@@ -453,11 +455,11 @@ def test_get_project_issue_types_empty_response(projects_mixin: ProjectsMixin):
 
 def test_get_project_issue_types_exception(projects_mixin: ProjectsMixin):
     """Test get_project_issue_types method with exception."""
-    projects_mixin.jira.issue_createmeta.side_effect = Exception("API error")
+    projects_mixin.jira.issue_createmeta_issuetypes.side_effect = Exception("API error")
 
     result = projects_mixin.get_project_issue_types("PROJ1")
     assert result == []
-    projects_mixin.jira.issue_createmeta.assert_called_once()
+    projects_mixin.jira.issue_createmeta_issuetypes.assert_called_once()
 
 
 def test_get_project_issues_count(projects_mixin: ProjectsMixin):
@@ -468,7 +470,21 @@ def test_get_project_issues_count(projects_mixin: ProjectsMixin):
     result = projects_mixin.get_project_issues_count("PROJ1")
     assert result == 42
     projects_mixin.jira.jql.assert_called_once_with(
-        jql="project = PROJ1", fields="key", limit=1
+        jql='project = "PROJ1"', fields="key", limit=1
+    )
+
+
+def test_get_project_issues_count__project_with_reserved_keyword(
+    projects_mixin: ProjectsMixin,
+):
+    """Test get_project_issues_count method."""
+    jql_result = {"total": 42}
+    projects_mixin.jira.jql.return_value = jql_result
+
+    result = projects_mixin.get_project_issues_count("AND")
+    assert result == 42
+    projects_mixin.jira.jql.assert_called_once_with(
+        jql='project = "AND"', fields="key", limit=1
     )
 
 
@@ -508,7 +524,7 @@ def test_get_project_issues_with_search_mixin(projects_mixin: ProjectsMixin):
     result = projects_mixin.get_project_issues("PROJ1", start=10, limit=20)
     assert result == mock_search_result
     projects_mixin.search_issues.assert_called_once_with(
-        "project = PROJ1", start=10, limit=20
+        'project = "PROJ1"', start=10, limit=20
     )
     projects_mixin.jira.jql.assert_not_called()
 
