@@ -179,14 +179,17 @@ async def search(
         str,
         Field(
             description=(
-                "JQL query string (Jira Query Language). Examples:\n"
+                "JQL query string (Jira Query Language). This is REQUIRED. Examples:\n"
                 '- Find Epics: "issuetype = Epic AND project = PROJ"\n'
                 '- Find issues in Epic: "parent = PROJ-123"\n'
                 "- Find by status: \"status = 'In Progress' AND project = PROJ\"\n"
                 '- Find by assignee: "assignee = currentUser()"\n'
                 '- Find recently updated: "updated >= -7d AND project = PROJ"\n'
                 '- Find by label: "labels = frontend AND project = PROJ"\n'
-                '- Find by priority: "priority = High AND project = PROJ"'
+                '- Find by priority: "priority = High AND project = PROJ"\n'
+                "IMPORTANT: You must provide a complete JQL string. Do NOT pass "
+                "individual parameters like 'project' or 'status' - construct "
+                "the full JQL query."
             )
         ),
     ],
@@ -232,7 +235,7 @@ async def search(
 
     Args:
         ctx: The FastMCP context.
-        jql: JQL query string.
+        jql: JQL query string. REQUIRED - must be a valid JQL query.
         fields: Comma-separated fields to return.
         limit: Maximum number of results.
         start_at: Starting index for pagination.
@@ -241,7 +244,22 @@ async def search(
 
     Returns:
         JSON string representing the search results including pagination info.
+
+    Raises:
+        ValueError: If jql parameter is empty or invalid.
     """
+    # Validate jql parameter
+    if not jql or not jql.strip():
+        error_result = {
+            "error": "JQL query is required but was empty or missing",
+            "hint": "Provide a valid JQL query string, e.g., 'project = PROJ ORDER BY updated DESC'",
+            "total": -1,
+            "start_at": -1,
+            "max_results": -1,
+            "issues": [],
+        }
+        return json.dumps(error_result, indent=2, ensure_ascii=False)
+
     jira = await get_jira_fetcher(ctx)
     fields_list: str | list[str] | None = fields
     if fields and fields != "*all":
