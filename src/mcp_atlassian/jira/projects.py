@@ -304,7 +304,7 @@ class ProjectsMixin(JiraClient, SearchOperationsProto):
             return 0
 
     def get_project_issues(
-        self, project_key: str, start: int = 0, limit: int = 50
+        self, project_key: str, start: int = 0, limit: int = 500
     ) -> JiraSearchResult:
         """
         Get issues for a specific project.

@@ -205,8 +205,8 @@ async def search(
     ] = ",".join(DEFAULT_READ_JIRA_FIELDS),
     limit: Annotated[
         int,
-        Field(description="Maximum number of results (1-50)", default=10, ge=1),
-    ] = 10,
+        Field(description="Maximum number of results", default=500, ge=1),
+    ] = 500,
     start_at: Annotated[
         int,
         Field(description="Starting index for pagination (0-based)", default=0, ge=0),
@@ -323,8 +323,8 @@ async def get_project_issues(
     project_key: Annotated[str, Field(description="The project key")],
     limit: Annotated[
         int,
-        Field(description="Maximum number of results (1-50)", default=10, ge=1, le=50),
-    ] = 10,
+        Field(description="Maximum number of results", default=500, ge=1),
+    ] = 500,
     start_at: Annotated[
         int,
         Field(description="Starting index for pagination (0-based)", default=0, ge=0),
@@ -392,6 +392,82 @@ async def get_worklog(
     jira = await get_jira_fetcher(ctx)
     worklogs = jira.get_worklogs(issue_key)
     result = {"worklogs": worklogs}
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(
+    tags={"jira", "read"},
+    annotations={"title": "Get Worklogs by Date Range", "readOnlyHint": True},
+)
+async def get_worklogs_by_date(
+    ctx: Context,
+    since_date: Annotated[
+        str,
+        Field(
+            description=(
+                "Start date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS). "
+                "Returns worklogs updated on or after this date."
+            )
+        ),
+    ],
+    until_date: Annotated[
+        str | None,
+        Field(
+            description=(
+                "(Optional) End date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS). "
+                "If not provided, returns all worklogs up to now."
+            ),
+            default=None,
+        ),
+    ] = None,
+    author: Annotated[
+        str | None,
+        Field(
+            description=(
+                "(Optional) Filter by author display name or email. "
+                "Partial match is supported (e.g., 'John' matches 'John Doe')."
+            ),
+            default=None,
+        ),
+    ] = None,
+) -> str:
+    """Get worklog entries by date range across all issues.
+
+    This tool bypasses the 5000-result limit of per-issue worklog queries by using
+    the Jira worklog/updated API. Use this for querying worklogs on specific dates,
+    especially for high-volume issues like time logging tickets.
+
+    Args:
+        ctx: The FastMCP context.
+        since_date: Start date (YYYY-MM-DD or ISO datetime).
+        until_date: Optional end date (YYYY-MM-DD or ISO datetime).
+        author: Optional author name/email to filter by.
+
+    Returns:
+        JSON string containing list of worklogs matching the criteria.
+
+    Example:
+        Get all worklogs for a specific date:
+        - since_date: "2026-01-16", until_date: "2026-01-16"
+
+        Get worklogs for a user on a date:
+        - since_date: "2026-01-16", until_date: "2026-01-16", author: "John"
+    """
+    jira = await get_jira_fetcher(ctx)
+    worklogs = jira.get_worklogs_by_date_range(
+        since_date=since_date,
+        until_date=until_date,
+        author_filter=author,
+    )
+    result = {
+        "worklogs": worklogs,
+        "count": len(worklogs),
+        "filters": {
+            "since_date": since_date,
+            "until_date": until_date,
+            "author": author,
+        },
+    }
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
@@ -513,8 +589,8 @@ async def get_board_issues(
     ] = 0,
     limit: Annotated[
         int,
-        Field(description="Maximum number of results (1-50)", default=10, ge=1, le=50),
-    ] = 10,
+        Field(description="Maximum number of results", default=500, ge=1),
+    ] = 500,
     expand: Annotated[
         str,
         Field(
@@ -618,8 +694,8 @@ async def get_sprint_issues(
     ] = 0,
     limit: Annotated[
         int,
-        Field(description="Maximum number of results (1-50)", default=10, ge=1, le=50),
-    ] = 10,
+        Field(description="Maximum number of results", default=500, ge=1),
+    ] = 500,
 ) -> str:
     """Get jira issues from sprint.
 

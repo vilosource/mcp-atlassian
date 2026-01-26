@@ -232,3 +232,202 @@ class WorklogMixin(JiraClient):
         except Exception as e:
             logger.error(f"Error getting worklogs for issue {issue_key}: {str(e)}")
             raise Exception(f"Error getting worklogs: {str(e)}") from e
+
+    def get_worklogs_updated_since(
+        self, since_timestamp_ms: int, expand: str | None = None
+    ) -> dict[str, Any]:
+        """
+        Get worklog IDs and update timestamps for worklogs updated after a timestamp.
+
+        This uses the Jira REST API endpoint: GET /rest/api/3/worklog/updated
+        which is NOT limited to 5000 results per issue and supports pagination.
+
+        Args:
+            since_timestamp_ms: UNIX timestamp in milliseconds after which
+                to return updated worklogs
+            expand: Optional expand parameter (e.g., 'properties')
+
+        Returns:
+            Dict containing 'values' list with worklog IDs and timestamps,
+            plus pagination info
+        """
+        try:
+            # NOTE: Cannot use self.jira.get_updated_worklogs() due to bug in
+            # atlassian-python-api where it multiplies `since` by 1000 even
+            # though the param is already in milliseconds, causing string
+            # multiplication when passed as string. Using direct API call.
+            url = self.jira.resource_url("worklog/updated")
+            params: dict[str, Any] = {"since": since_timestamp_ms}
+            if expand:
+                params["expand"] = expand
+
+            result = self.jira.get(url, params=params)
+            if not isinstance(result, dict):
+                return {"values": [], "lastPage": True}
+            return result
+        except Exception as e:  # noqa: BLE001 - Intentional fallback with logging
+            logger.error(
+                f"Error getting updated worklogs since {since_timestamp_ms}: {e}"
+            )
+            return {"values": [], "lastPage": True, "error": str(e)}
+
+    def get_worklogs_by_ids(
+        self, worklog_ids: list[int | str], expand: str | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Get full worklog details for a list of worklog IDs.
+
+        This uses the Jira REST API endpoint: POST /rest/api/3/worklog/list
+        which returns complete worklog information for the specified IDs.
+
+        Args:
+            worklog_ids: List of worklog IDs to retrieve
+            expand: Optional expand parameter (e.g., 'properties')
+
+        Returns:
+            List of worklog entries with full details
+        """
+        if not worklog_ids:
+            return []
+
+        try:
+            # Convert all IDs to integers (API expects int list)
+            ids = [int(wid) for wid in worklog_ids]
+            result = self.jira.get_worklogs(ids=ids, expand=expand)
+
+            if not isinstance(result, list):
+                logger.warning(
+                    f"Unexpected result type from get_worklogs: {type(result)}"
+                )
+                return []
+
+            # Process and format worklogs
+            worklogs = []
+            for worklog in result:
+                author = worklog.get("author", {}).get("displayName", "Unknown")
+                worklogs.append(
+                    {
+                        "id": worklog.get("id"),
+                        "issueId": worklog.get("issueId"),
+                        "comment": self._clean_text(worklog.get("comment", "")),
+                        "created": str(parse_date(worklog.get("created", ""))),
+                        "updated": str(parse_date(worklog.get("updated", ""))),
+                        "started": str(parse_date(worklog.get("started", ""))),
+                        "timeSpent": worklog.get("timeSpent", ""),
+                        "timeSpentSeconds": worklog.get("timeSpentSeconds", 0),
+                        "author": author,
+                    }
+                )
+
+            return worklogs
+        except Exception as e:  # noqa: BLE001 - Intentional fallback with logging
+            logger.error(f"Error getting worklogs by IDs: {e}")
+            return []
+
+    def get_worklogs_by_date_range(
+        self,
+        since_date: str,
+        until_date: str | None = None,
+        author_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Get all worklogs updated within a date range, optionally filtered by author.
+
+        This bypasses the 5000-result limit of per-issue worklog queries by using
+        the global worklog/updated API instead.
+
+        Args:
+            since_date: Start date in ISO format (YYYY-MM-DD) or datetime
+            until_date: Optional end date in ISO format (YYYY-MM-DD) or datetime.
+                       If not provided, returns all worklogs up to now.
+            author_filter: Optional author display name or email to filter by
+
+        Returns:
+            List of worklog entries matching the criteria
+        """
+        from datetime import datetime, timezone
+
+        try:
+            # Parse since_date to timestamp in milliseconds
+            if "T" in since_date:
+                since_dt = datetime.fromisoformat(since_date.replace("Z", "+00:00"))
+            else:
+                since_dt = datetime.strptime(since_date, "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
+            since_timestamp_ms = int(since_dt.timestamp() * 1000)
+
+            # Parse until_date if provided
+            until_timestamp_ms = None
+            if until_date:
+                if "T" in until_date:
+                    until_dt = datetime.fromisoformat(until_date.replace("Z", "+00:00"))
+                else:
+                    # End of day for date-only input
+                    until_dt = datetime.strptime(until_date, "%Y-%m-%d").replace(
+                        hour=23, minute=59, second=59, tzinfo=timezone.utc
+                    )
+                until_timestamp_ms = int(until_dt.timestamp() * 1000)
+
+            # Step 1: Get all worklog IDs updated since the start date
+            all_worklog_ids = []
+            result = self.get_worklogs_updated_since(since_timestamp_ms)
+
+            for entry in result.get("values", []):
+                worklog_id = entry.get("worklogId")
+                updated_time = entry.get("updatedTime")
+
+                # Filter by until_date if specified
+                if until_timestamp_ms and updated_time:
+                    if updated_time > until_timestamp_ms:
+                        continue
+
+                if worklog_id:
+                    all_worklog_ids.append(worklog_id)
+
+            # Handle pagination if there are more results
+            while not result.get("lastPage", True) and result.get("nextPage"):
+                # The nextPage URL contains the since parameter for the next batch
+                next_since = result.get("until")
+                if next_since:
+                    result = self.get_worklogs_updated_since(int(next_since))
+                    for entry in result.get("values", []):
+                        worklog_id = entry.get("worklogId")
+                        updated_time = entry.get("updatedTime")
+                        if until_timestamp_ms and updated_time:
+                            if updated_time > until_timestamp_ms:
+                                continue
+                        if worklog_id:
+                            all_worklog_ids.append(worklog_id)
+                else:
+                    break
+
+            if not all_worklog_ids:
+                return []
+
+            # Step 2: Fetch full worklog details in batches (API limit is 1000 IDs per request)
+            all_worklogs = []
+            batch_size = 1000
+            for i in range(0, len(all_worklog_ids), batch_size):
+                batch_ids = all_worklog_ids[i : i + batch_size]
+                batch_worklogs = self.get_worklogs_by_ids(batch_ids)
+                all_worklogs.extend(batch_worklogs)
+
+            # Step 3: Filter by author if specified
+            if author_filter:
+                author_lower = author_filter.lower()
+                all_worklogs = [
+                    w
+                    for w in all_worklogs
+                    if author_lower in w.get("author", "").lower()
+                ]
+
+            # Sort by started date descending (most recent first)
+            all_worklogs.sort(key=lambda w: w.get("started", ""), reverse=True)
+
+            return all_worklogs
+
+        except Exception as e:  # noqa: BLE001 - Intentional re-raise with context
+            logger.error(f"Error getting worklogs by date range: {e}")
+            msg = f"Error getting worklogs by date range: {e}"
+            raise Exception(msg) from e

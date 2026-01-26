@@ -23,7 +23,7 @@ class SearchMixin(JiraClient, IssueOperationsProto):
         jql: str,
         fields: list[str] | tuple[str, ...] | set[str] | str | None = None,
         start: int = 0,
-        limit: int = 50,
+        limit: int = 500,
         expand: str | None = None,
         projects_filter: str | None = None,
     ) -> JiraSearchResult:
@@ -146,7 +146,7 @@ class SearchMixin(JiraClient, IssueOperationsProto):
 
                 return search_result
             else:
-                limit = min(limit, 50)
+                limit = min(limit, 500)
                 response = self.jira.jql(
                     jql, fields=fields_param, start=start, limit=limit, expand=expand
                 )
@@ -187,7 +187,7 @@ class SearchMixin(JiraClient, IssueOperationsProto):
         jql: str,
         fields: str | None = None,
         start: int = 0,
-        limit: int = 50,
+        limit: int = 500,
         expand: str | None = None,
     ) -> JiraSearchResult:
         """
@@ -249,7 +249,7 @@ class SearchMixin(JiraClient, IssueOperationsProto):
         sprint_id: str,
         fields: str | None = None,
         start: int = 0,
-        limit: int = 50,
+        limit: int = 500,
     ) -> JiraSearchResult:
         """
         Get all issues linked to a specific sprint.
